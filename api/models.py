@@ -20,6 +20,7 @@ class Wallet(models.Model):
 
 class Ledger(models.Model):
 	customer_xid = models.CharField(max_length=255)
+	transaction_type = models.CharField(max_length=255)
 	transaction_datetime = models.DateTimeField()
 	status = models.CharField(max_length=255)
 	reference_id = models.CharField(max_length=255, unique=True)

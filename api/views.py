@@ -12,7 +12,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from api.models import Account, Wallet, Ledger
-from api.validations import validate_reference_id, validate_wallet_status, validate_wallet_balance
+from api.validations import validate_reference_id, validate_wallet_status, validate_wallet_balance, validate_token
 
 
 @csrf_exempt
@@ -71,13 +71,6 @@ def wallet(request):
 		}
 
 	return HttpResponse(json.dumps(res), content_type='application/json')
-
-
-def validate_token(token):
-	is_valid_token = Account.objects.filter(token=token).first()
-
-	if not is_valid_token:
-		raise Exception("Invalid token")
 
 
 def change_wallet_status(account_obj, request):
@@ -167,6 +160,50 @@ def get_wallet(account_obj):
 
 
 @csrf_exempt
+@api_view(["GET"])
+def transactions(request):
+	try:
+		ledger_list = []
+		token = request.headers.get("Authorization").split("Token ")
+		validate_token(token[1])
+
+		account_obj = Account.objects.get(token=token[1])
+		validate_wallet_status(account_obj)
+
+		wallet_obj = Wallet.objects.get(owned_by=account_obj.customer_xid)
+
+		ledgers = Ledger.objects.filter(customer_xid=account_obj)
+
+		for ledger in ledgers:
+			ledger_list.append({
+				"transaction_type": ledger.transaction_type,
+				"transaction_datetime": str(ledger.transaction_datetime),
+				"status": ledger.status,
+				"reference_id": ledger.reference_id,
+				"amount": float(ledger.amount)
+			})
+
+		res = {
+			"status": "success",
+			"data": {
+				"customer_xid": account_obj.customer_xid,
+				"balance": float(wallet_obj.balance),
+				"transactions": ledger_list
+			}
+		}
+
+	except Exception as e:
+		res = {
+			"data": {
+				"error": repr(e)
+			},
+			"status": "fail"
+		}
+
+	return HttpResponse(json.dumps(res), content_type='application/json')
+
+
+@csrf_exempt
 @api_view(["POST"])
 def deposits(request):
 	data = request.data
@@ -184,6 +221,7 @@ def deposits(request):
 
 		ledger_obj = Ledger(
 			customer_xid=account_obj,
+			transaction_type="deposit",
 			transaction_datetime=datetime.now(),
 			status="success",
 			reference_id=data.get("reference_id"),
@@ -238,6 +276,7 @@ def withdrawals(request):
 
 		ledger_obj = Ledger(
 			customer_xid=account_obj,
+			transaction_type="withdraw",
 			transaction_datetime=datetime.now(),
 			status="success",
 			reference_id=data.get("reference_id"),

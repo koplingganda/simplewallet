@@ -1,4 +1,11 @@
-from api.models import Wallet, Ledger
+from api.models import Account, Wallet, Ledger
+
+
+def validate_token(token):
+	is_valid_token = Account.objects.filter(token=token).first()
+
+	if not is_valid_token:
+		raise Exception("Invalid token")
 
 
 def validate_wallet_status(account_obj):
