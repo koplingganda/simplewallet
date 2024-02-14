@@ -12,6 +12,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from api.models import Account, Wallet, Ledger
+from api.validations import validate_reference_id, validate_wallet_status, validate_wallet_balance
 
 
 @csrf_exempt
@@ -52,6 +53,8 @@ def wallet(request):
 
 	try:
 		token = request.headers.get("Authorization").split("Token ")
+		validate_token(token[1])
+
 		account_obj = Account.objects.get(token=token[1])
 
 		if request.method in ("POST", "PATCH"):
@@ -68,6 +71,13 @@ def wallet(request):
 		}
 
 	return HttpResponse(json.dumps(res), content_type='application/json')
+
+
+def validate_token(token):
+	is_valid_token = Account.objects.filter(token=token).first()
+
+	if not is_valid_token:
+		raise Exception("Invalid token")
 
 
 def change_wallet_status(account_obj, request):
@@ -113,6 +123,7 @@ def change_wallet_status(account_obj, request):
 		}
 
 	elif is_wallet_exist and data.get("is_disabled"):
+		validate_wallet_status(account_obj)
 		wallet_obj = Wallet.objects.get(owned_by=account_obj.customer_xid)
 
 		wallet_obj.status = "disabled"
@@ -140,6 +151,7 @@ def change_wallet_status(account_obj, request):
 
 
 def get_wallet(account_obj):
+	validate_wallet_status(account_obj)
 	wallet_obj = Wallet.objects.get(owned_by=account_obj.customer_xid)
 
 	return {
@@ -148,7 +160,6 @@ def get_wallet(account_obj):
 			"owned_by": account_obj.customer_xid,
 			"status": wallet_obj.status,
 			"enabled_at": str(wallet_obj.enabled_at),
-			"disabled_at": str(wallet_obj.disabled_at),
 			"balance": float(wallet_obj.balance)
 		},
 		"status": "success"
@@ -156,10 +167,106 @@ def get_wallet(account_obj):
 
 
 @csrf_exempt
+@api_view(["POST"])
 def deposits(request):
-	print(request)
+	data = request.data
+
+	try:
+		token = request.headers.get("Authorization").split("Token ")
+		validate_token(token[1])
+		validate_reference_id(data.get("reference_id"))
+
+		account_obj = Account.objects.get(token=token[1])
+		validate_wallet_status(account_obj)
+
+		wallet_obj = Wallet.objects.get(owned_by=account_obj)
+		wallet_obj.balance = float(wallet_obj.balance) + float(data.get("amount"))
+
+		ledger_obj = Ledger(
+			customer_xid=account_obj,
+			transaction_datetime=datetime.now(),
+			status="success",
+			reference_id=data.get("reference_id"),
+			amount=float(data.get("amount"))
+		)
+
+		wallet_obj.save()
+		ledger_obj.save()
+
+		res = {
+			"status": "success",
+			"data": {
+				"deposit": {
+					"id": ledger_obj.id,
+					"deposited_by": account_obj.customer_xid,
+					"status": "success",
+					"deposited_at": str(ledger_obj.transaction_datetime),
+					"amount": float(ledger_obj.amount),
+					"reference_id": ledger_obj.reference_id
+				}
+			}
+		}
+
+	except Exception as e:
+		res = {
+			"data": {
+				"error": repr(e)
+			},
+			"status": "fail"
+		}
+
+	return HttpResponse(json.dumps(res), content_type='application/json')
 
 
 @csrf_exempt
+@api_view(["POST"])
 def withdrawals(request):
-	print(request)
+	data = request.data
+
+	try:
+		token = request.headers.get("Authorization").split("Token ")
+		validate_token(token[1])
+		validate_reference_id(data.get("reference_id"))
+
+		account_obj = Account.objects.get(token=token[1])
+		validate_wallet_status(account_obj)
+
+		wallet_obj = Wallet.objects.get(owned_by=account_obj)
+		validate_wallet_balance(float(wallet_obj.balance), float(data.get("amount")))
+
+		wallet_obj.balance = float(wallet_obj.balance) - float(data.get("amount"))
+
+		ledger_obj = Ledger(
+			customer_xid=account_obj,
+			transaction_datetime=datetime.now(),
+			status="success",
+			reference_id=data.get("reference_id"),
+			amount=float(data.get("amount"))
+		)
+
+		ledger_obj.save()
+		wallet_obj.save()
+
+		res = {
+			"status": "success",
+			"data": {
+				"deposit": {
+					"id": ledger_obj.id,
+					"withdrawn_by": account_obj.customer_xid,
+					"status": "success",
+					"withdrawn_at": str(ledger_obj.transaction_datetime),
+					"amount": float(ledger_obj.amount),
+					"reference_id": ledger_obj.reference_id
+				}
+			}
+		}
+
+	except Exception as e:
+		res = {
+			"data": {
+				"error": repr(e)
+			},
+			"status": "fail"
+		}
+
+	return HttpResponse(json.dumps(res), content_type='application/json')
