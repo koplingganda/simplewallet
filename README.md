@@ -53,17 +53,23 @@ pip install django_rest_framework
 ```
 ![image](https://github.com/koplingganda/simplewallet/assets/48271907/77baa510-9964-470c-96d1-50879e094143)
 
-9. Run migrate command
+9. Enter into Git repository folder
+```
+cd simplewallet
+```
+![image](https://github.com/koplingganda/simplewallet/assets/48271907/83b661a9-08c3-4f88-8b04-c8c0aa00dd27)
+
+10. Run migrate command
 ```
 python manage.py migrate
 ```
 ![image](https://github.com/koplingganda/simplewallet/assets/48271907/752b3c7c-6a69-47b9-944b-b3020367477b)
 
-10. Run python manage.py runserver
+11. Run python manage.py runserver
 ```
 python manage.py runserver
 ```
 ![image](https://github.com/koplingganda/simplewallet/assets/48271907/dfa1ed07-689f-4071-9356-72e90f76e550)
 
-11. Access on http://localhost:8000
+12. Access on http://localhost:8000
 ![image](https://github.com/koplingganda/simplewallet/assets/48271907/8f98d19b-8098-4a8f-a32f-655e15766d0e)
